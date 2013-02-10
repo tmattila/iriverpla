@@ -39,7 +39,7 @@ private slots:
     void on_action_Add_to_playlist_triggered();
     void on_actionIriver_Plus_triggered();
     void on_actionShow_Log_triggered();
-    void on_action_Destination_triggered();
+    void on_actionPlaylist_Destination_triggered();
     void on_actionMusic_destination_triggered();
     void on_actionRemove_triggered();
     void on_actionGenerate_triggered();

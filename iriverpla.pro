@@ -22,3 +22,5 @@ HEADERS  += iriverpla.h \
 FORMS    += iriverpla.ui
 
 QMAKE_CXXFLAGS += -std=c++11
+
+OTHER_FILES +=

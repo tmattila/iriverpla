@@ -32,7 +32,7 @@ IRiverPla::~IRiverPla()
 /**
  * \brief Define the destination into which playlist is copied.
  */
-void IRiverPla::on_action_Destination_triggered()
+void IRiverPla::on_actionPlaylist_Destination_triggered()
 {
     qDebug() << "IRiverPla::on_action_Destination_triggered()";
     QString destination = QFileDialog::getExistingDirectory(this, tr("Select location where playlist is saved"), playList->playlistDestination);
@@ -107,7 +107,7 @@ void IRiverPla::on_actionGenerate_triggered()
     qDebug() << "IRiverPla::on_actionGenerate_triggered()";
     try {
         playList->playlistName = ui->edtPlaylistName->text();
-        playList->generatePLAFile();
+        playList->doWork();
     }
     catch (...) {
         qDebug() << "Playlist generation failed";
@@ -135,7 +135,7 @@ void IRiverPla::on_btnGenerate_clicked() {
     on_actionGenerate_triggered();
 }
 void IRiverPla::on_btnPlaylistdestination_clicked() {
-    on_action_Destination_triggered();
+    on_actionPlaylist_Destination_triggered();
 }
 /**
  * @brief IRiverPla::on_btnUp_clicked

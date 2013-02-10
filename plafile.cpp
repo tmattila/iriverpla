@@ -18,18 +18,18 @@ plaPlayList::plaPlayList(QObject *parent) :
 }
 int plaPlayList::addFile(QString name)
 {
-    m_lstFiles.append(name);
-    return m_lstFiles.count();
+    m_lstSrcFiles.append(name);
+    return m_lstSrcFiles.count();
 }
 int plaPlayList::setFiles(QStringList names)
 {
-    m_lstFiles = names;
-    return m_lstFiles.count();
+    m_lstSrcFiles = names;
+    return m_lstSrcFiles.count();
 }
 int plaPlayList::addFiles(QStringList names)
 {
-    m_lstFiles += names;
-    return m_lstFiles.count();
+    m_lstSrcFiles += names;
+    return m_lstSrcFiles.count();
 }
 /**
  * @brief Extracts all files from specified directory and adds supported files to playlist
@@ -55,7 +55,7 @@ int plaPlayList::addDirectory(QString name)
  */
 QString plaPlayList::getPLAAsString()
 {
-    return m_lstFiles.join("\r\n");
+    return m_lstSrcFiles.join("\r\n");
 }
 /**
  * @brief Returns a proper filter for 'FileOpen dialog', enumerates all supported file formats.
@@ -92,7 +92,7 @@ QStringList plaPlayList::filterSupportedFiles(QStringList files)
  */
 long plaPlayList::playlistFileAmount()
 {
-    return m_lstFiles.size();
+    return m_lstSrcFiles.size();
 }
 /**
  * @brief Used to get the amount of bytes in the generated playlist file (*.pla)
@@ -126,7 +126,7 @@ bool plaPlayList::generatePLAFile()
 {
     try {
         // 5. generate playlist
-        qint32 fileCount = (qint32)m_lstFiles.count();
+        qint32 fileCount = (qint32)m_lstSrcFiles.count();
         if (playlistName.isEmpty())
             playlistName = "playlist.pla";
         if (!playlistName.endsWith(".pla"))
@@ -152,14 +152,14 @@ bool plaPlayList::generatePLAFile()
         // File Info
         QString outputFile = "";
         qint16 nameIndex = 0;
-        foreach (QString song, m_lstFiles) {
+        foreach (QString song, m_lstSrcFiles) {
             if (song.length()>=512) {
                 qDebug() << "Song " << song << " file path was too long, skipping it";
                 continue;
             }
             if(!getFileName(song, &outputFile, &nameIndex)) {
                 qDebug() << "Song " << song << " path and index extraction failed, PLA is not usable!";
-                OnError(QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss.zzz"), "ERROR", QString("Song '%1' path and index extraction failed, PLA is not usable!").arg(song));
+                errorSignaling("ERROR", QString("Song '%1' path and index extraction failed, PLA is not usable!").arg(song));
                 return false;
             }
             qDebug() << " song: " << outputFile;
@@ -169,7 +169,7 @@ bool plaPlayList::generatePLAFile()
             for (int i=(3+outputFile.size()*2); i<512; i++)
                 out << (qint8)0;
         }
-        qDebug() << "plaPlayList::generatePLAFile - data written, playlist size: " << file.size() << ", should be 512 + " << m_lstFiles.count() << "*512 = " << 512 + m_lstFiles.count() * 512;
+        qDebug() << "plaPlayList::generatePLAFile - data written, playlist size: " << file.size() << ", should be 512 + " << m_lstSrcFiles.count() << "*512 = " << 512 + m_lstSrcFiles.count() * 512;
         file.close();
         OnReady();
         return true;
@@ -179,9 +179,10 @@ bool plaPlayList::generatePLAFile()
         return false;
     }
 }
+
 /**
- * @brief Idea is to just check that main level (folder) exists into which music files are copied.
- * @return true if playlist files destination folder (main level) exists and false otherwise
+ * @brief Idea is to check that main level folder exists into which playlist file is copied.
+ * @return true if playlist destination folder exists and false otherwise
  */
 bool plaPlayList::checkPlaylistDestinationAvailability()
 {
@@ -191,24 +192,35 @@ bool plaPlayList::checkPlaylistDestinationAvailability()
 /**
  * @brief Idea is to:
  * \li check that main level (folder) exists into which music files are copied
- * \li check destination if that already has some files that are selected in playlist and try to remove from the
+ * \li check destination if that already has some files that are selected in playlist and move nonexisting files to m_lstCopyFiles list
  * @return true if music files destination folder (main level) exists and false otherwise
  */
-bool plaPlayList::checkDestinationFilesAvailability(QStringList &duplicateFiles)
+bool plaPlayList::checkDestinationFilesAvailability()
 {
     QDir dir(musicFileDestination);
     if (!dir.exists()) {
+        errorSignaling("ERROR", QString("Music file destination main directory (%1) did not exist?").arg(musicFileDestination));
         return false;
     }
     QStringList destinationFiles = dir.entryList(QDir::Files | QDir::NoDotAndDotDot);
-    QStringList removeItems;
-    for (int i=0; i < duplicateFiles.count(); i++) {
-        if (destinationFiles.contains(duplicateFiles.at(i)))
-            removeItems.append(duplicateFiles.at(i));
+    QStringList dublicates;
+    QStringList::Iterator it = m_lstSrcFiles.begin();
+    QStringList::Iterator end = m_lstSrcFiles.end();
+    while (it != end) {
+        if (destinationFiles.contains(*it))
+            dublicates.append(*it);
+        ++it;
     }
-    foreach (QString file, removeItems) {
-        qDebug() << " removing playlist item " << file << " while it already exists in destination " << musicFileDestination;
-        duplicateFiles.removeOne(file);
+    m_lstCopyFiles.clear();
+    it = dublicates.begin();
+    end = dublicates.end();
+    while (it != end) {
+        if (!m_lstSrcFiles.contains(*it))
+            m_lstCopyFiles.append(*it);
+        ++it;
+    }
+    foreach (QString file, dublicates) {
+        qDebug() << " playlist item " << file << " already exists in destination " << musicFileDestination;
     }
     return true;
 }
@@ -255,22 +267,6 @@ bool plaPlayList::getFileName(QString song, QString *outFile, qint16 *nameIndex)
     return true;
 }
 /**
- * @brief Method checks all playlist files whether they already exists in destination
- * @param alreadyExists List of files that can do exist already in destination
- * @return true if some files can already exists in destination, false otherwise
- */
-bool plaPlayList::checkIfFilesExists(QStringList *alreadyExists)
-{
-    try {
-        QFileInfo fi;
-        for (int i=0; i<m_lstFiles.count(); i++) {
-            fi.setFile(m_lstFiles.at(i));
-        }
-    }
-    catch (...) {
-    }
-}
-/**
  * @brief Verify that we can copy all necessary files to destination and that device has enough free diskspace.
  * @param deviceTotal device amount of free space
  * @param neededSize amount of megabytes needed to synchronize the playlist
@@ -278,5 +274,28 @@ bool plaPlayList::checkIfFilesExists(QStringList *alreadyExists)
  */
 bool plaPlayList::checkIfIEnoughCapacity(int *deviceTotal, int *neededSize)
 {
+    *deviceTotal = 0;
+    *neededSize = 0;
+    // Find out destinations free capacity...
+    QDir dir(musicFileDestination);
+    QFileInfoList drives = dir.drives();
+    qDebug() << "Number of drives in system: " << drives.count();
+    foreach( QFileInfo info, drives)
+        qDebug() << " " << info.absolutePath();
+    // find out needed space
+    QFileInfo fi;
+    foreach (QString file, m_lstCopyFiles) {
+        fi.setFile(file);
+        *neededSize += fi.size();
+    }
+    return true;
 }
-
+/**
+ * @brief Wrapper method for sending OnError event
+ * @param category
+ * @param message
+ */
+void plaPlayList::errorSignaling(QString category, QString message)
+{
+    OnError(QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss.zzz"), category, message);
+}

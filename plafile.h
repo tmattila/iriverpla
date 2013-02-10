@@ -51,15 +51,15 @@ class plaPlayList : public QObject
 private:
     // Private variables and methods
     QStringList m_lstSrcFiles;
-    QStringList m_lstDstFiles;
+    QStringList m_lstCopyFiles;
 
-    bool checkDestinationAvailability();
-    bool checkDestinationFilesAvailability(QStringList &duplicateFiles);
+    bool checkPlaylistDestinationAvailability();
+    bool checkDestinationFilesAvailability();
     bool copyMissingFilesToDestination();
     bool getFileName(QString song, QString*outFile, qint16*);
-    bool checkIfFilesExists(QStringList *alreadyExists);
     bool checkIfIEnoughCapacity(int* deviceTotal, int* neededSize);
     bool generatePLAFile();
+    void errorSignaling(QString category, QString message);
 
 public:
     // Public interface
